@@ -1,18 +1,16 @@
 import { GridConfigArraySchema } from './schemas';
 import { convertOldConfigArrayToNewConfigArray } from './converters';
-import { readFileSync, writeFileSync } from 'fs';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { join, dirname } from 'path';
 
 console.log('🚀 Grid View Stats Migrator - Converting All Data\n');
 
 try {
-  // Get current directory for ES modules
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = dirname(__filename);
+  // Get current directory for CommonJS modules
+  const currentDir = process.cwd();
 
   // Read the old data
-  const dataPath = join(__dirname, '../docs/old-data.json');
+  const dataPath = join(currentDir, 'docs/old-data.json');
   const rawData = readFileSync(dataPath, 'utf-8');
   const data = JSON.parse(rawData);
 
@@ -85,16 +83,14 @@ try {
   });
 
   // Save migrated data to a file
-  const outputPath = join(__dirname, '../output/migrated-data.json');
+  const outputPath = join(currentDir, 'output/migrated-data.json');
   const outputDir = dirname(outputPath);
 
   // Create output directory if it doesn't exist
   try {
-    import('fs').then((fs) => {
-      if (!fs.existsSync(outputDir)) {
-        fs.mkdirSync(outputDir, { recursive: true });
-      }
-    });
+    if (!existsSync(outputDir)) {
+      mkdirSync(outputDir, { recursive: true });
+    }
   } catch {
     // Directory creation will be handled by writeFileSync
   }
