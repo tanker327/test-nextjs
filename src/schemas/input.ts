@@ -1,5 +1,9 @@
 import { z } from 'zod';
 
+// Define filter types as a constant
+export const FILTER_TYPES = ['text', 'number', 'date', 'set', 'multi'] as const;
+export type FilterType = typeof FILTER_TYPES[number];
+
 // Column setting schema for individual column configuration
 export const ColumnSettingSchema = z.object({
   colId: z.string(),
@@ -25,7 +29,7 @@ export const ColumnSettingsArraySchema = z.array(ColumnSettingSchema);
 
 // Text and Number filter model
 export const TextNumberFilterModelSchema = z.object({
-  filterType: z.enum(['text', 'number']).optional(),
+  filterType: z.enum(['text', 'number'] as const).optional(),
   type: z
     .enum([
       'empty',
@@ -87,7 +91,7 @@ export const SimpleFilterModelSchema = z.union([
 // Combined filter model for complex filters (example: textEqualsSwimmingOrEqualsGymnastics)
 // This extends simple filter by adding operator and conditions at the same level
 export const CombinedFilterModelSchema = z.object({
-  filterType: z.enum(['text', 'number', 'date']),
+  filterType: z.enum(['text', 'number', 'date'] as const),
   operator: z.enum(['AND', 'OR']),
   conditions: z.array(
     z.union([TextNumberFilterModelSchema, DateFilterModelSchema, SetFilterModelSchema]),

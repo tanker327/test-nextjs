@@ -788,5 +788,157 @@ describe('Grid View Stats Migration', () => {
         dateTo: '2023-12-31',
       });
     });
+
+    it('should convert set filter to text filter with OR conditions when column is mapped as text', () => {
+      // Test for IP_AND_SM type where shortId is mapped as 'text'
+      const gridConfig = {
+        ...getValidatedInputData()[0],
+        type: 'IP_AND_SM' as const,
+        filter_settings: {
+          shortId: {
+            filterType: 'set',
+            values: ['008563', '007201'],
+          },
+        },
+      };
+
+      const result = convertOldConfigToNewConfig(gridConfig);
+      const gridState = JSON.parse(result.gridState);
+
+      expect(gridState.filterModel.shortId).toEqual({
+        filterType: 'text',
+        operator: 'OR',
+        conditions: [
+          {
+            filterType: 'text',
+            type: 'equals',
+            filter: '008563',
+          },
+          {
+            filterType: 'text',
+            type: 'equals',
+            filter: '007201',
+          },
+        ],
+      });
+    });
+
+    it('should convert set filter to text filter for MILESTONE type', () => {
+      // Test for MILESTONE type where shortId is also mapped as 'text'
+      const gridConfig = {
+        ...getValidatedInputData()[0],
+        type: 'MILESTONE' as const,
+        filter_settings: {
+          shortId: {
+            filterType: 'set',
+            values: ['M001', 'M002', 'M003'],
+          },
+        },
+      };
+
+      const result = convertOldConfigToNewConfig(gridConfig);
+      const gridState = JSON.parse(result.gridState);
+
+      expect(gridState.filterModel.shortId).toEqual({
+        filterType: 'text',
+        operator: 'OR',
+        conditions: [
+          {
+            filterType: 'text',
+            type: 'equals',
+            filter: 'M001',
+          },
+          {
+            filterType: 'text',
+            type: 'equals',
+            filter: 'M002',
+          },
+          {
+            filterType: 'text',
+            type: 'equals',
+            filter: 'M003',
+          },
+        ],
+      });
+    });
+
+    it('should NOT convert set filter for columns mapped as set', () => {
+      // Test that columns mapped as 'set' keep their set filter
+      const gridConfig = {
+        ...getValidatedInputData()[0],
+        type: 'IP_AND_SM' as const,
+        filter_settings: {
+          state: {
+            filterType: 'set',
+            values: ['Active', 'Inactive'],
+          },
+        },
+      };
+
+      const result = convertOldConfigToNewConfig(gridConfig);
+      const gridState = JSON.parse(result.gridState);
+
+      // 'state' is mapped as 'set', so it should NOT be converted
+      expect(gridState.filterModel.state).toEqual({
+        filterType: 'set',
+        values: ['Active', 'Inactive'],
+      });
+    });
+
+    it('should handle mixed filters with some converting and some not', () => {
+      const gridConfig = {
+        ...getValidatedInputData()[0],
+        type: 'IP_AND_SM' as const,
+        filter_settings: {
+          shortId: {
+            filterType: 'set',
+            values: ['008563', '007201'],
+          },
+          state: {
+            filterType: 'set',
+            values: ['Active'],
+          },
+          title: {
+            filterType: 'text',
+            type: 'contains',
+            filter: 'test',
+          },
+        },
+      };
+
+      const result = convertOldConfigToNewConfig(gridConfig);
+      const gridState = JSON.parse(result.gridState);
+
+      // shortId should be converted (text column with set filter)
+      expect(gridState.filterModel.shortId).toEqual({
+        filterType: 'text',
+        operator: 'OR',
+        conditions: [
+          {
+            filterType: 'text',
+            type: 'equals',
+            filter: '008563',
+          },
+          {
+            filterType: 'text',
+            type: 'equals',
+            filter: '007201',
+          },
+        ],
+      });
+
+      // state should NOT be converted (set column with set filter)
+      expect(gridState.filterModel.state).toEqual({
+        filterType: 'set',
+        values: ['Active'],
+      });
+
+      // title should remain unchanged (text column with text filter)
+      expect(gridState.filterModel.title).toEqual({
+        filterType: 'text',
+        type: 'contains',
+        filter: 'test',
+      });
+    });
   });
 });

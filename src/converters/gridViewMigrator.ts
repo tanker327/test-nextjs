@@ -1,6 +1,7 @@
 import { GridConfig, ColumnSetting, FilterSettings } from '../schemas/input';
 import { ViewConfig, User, GridState } from '../schemas/output';
 import { migrateColumnId } from '../mappings/columnIdMigration';
+import { getIpColumnFilter, getMilestoneColumnFilter } from '../mappings/filterMapping';
 
 // ✅ RESOLVED: GridState combines ag-grid standard structure with Phoenix-specific properties
 // Based on actual data in new_data.json, the gridState contains both:
@@ -104,6 +105,7 @@ function mapOldPropertiesToNew(col: ColumnSetting) {
 function buildGridState(
   columnSettings: ColumnSetting[] | null,
   filterSettings: FilterSettings | null,
+  gridType: 'MILESTONE' | 'IP_AND_SM',
 ): GridState {
   // Transform column settings from input format to ag-grid ColumnState format
   const columnState = columnSettings?.map((col) => mapOldPropertiesToNew(col)) || [];
@@ -113,10 +115,36 @@ function buildGridState(
   // FilterSettings now properly typed as ag-grid filter models with migrated keys
   const filterModel: Record<string, unknown> = {};
   if (filterSettings) {
+    // Get the appropriate filter map based on grid type
+    const getColumnFilter = gridType === 'MILESTONE' ? getMilestoneColumnFilter : getIpColumnFilter;
+    
     // Migrate filter keys from old column IDs to new column IDs
     Object.entries(filterSettings).forEach(([oldColId, filterConfig]) => {
       const newColId = migrateColumnId(oldColId);
-      filterModel[newColId] = filterConfig;
+      const expectedFilterType = getColumnFilter(oldColId);
+      
+      // Check if we need to convert set filter to text filter with OR conditions
+      if (filterConfig && 
+          typeof filterConfig === 'object' && 
+          'filterType' in filterConfig && 
+          filterConfig.filterType === 'set' && 
+          'values' in filterConfig &&
+          Array.isArray(filterConfig.values) &&
+          expectedFilterType === 'text') {
+        // Convert set filter to text filter with OR conditions
+        filterModel[newColId] = {
+          filterType: 'text',
+          operator: 'OR',
+          conditions: filterConfig.values.map((value: string) => ({
+            filterType: 'text',
+            type: 'equals',
+            filter: value
+          }))
+        };
+      } else {
+        // Keep the original filter config
+        filterModel[newColId] = filterConfig;
+      }
     });
   }
 
@@ -166,7 +194,7 @@ function convertTimestamp(timestamp: number): string {
  */
 export function convertOldConfigToNewConfig(gridConfig: GridConfig): RawViewConfig {
   const user = createUserFromOwner(gridConfig.owner);
-  const gridState = buildGridState(gridConfig.column_settings, gridConfig.filter_settings);
+  const gridState = buildGridState(gridConfig.column_settings, gridConfig.filter_settings, gridConfig.type);
 
   return {
     viewId: gridConfig.id,
